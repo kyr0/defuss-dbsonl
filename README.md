@@ -16,7 +16,7 @@ The package is on the npm registry. It needs Node.js 20.19 or newer, Bun, or a d
 
 VERIFIED: The native lock addon, `@lickle/lock`, ships prebuilt binaries as optional dependencies for Linux x64 glibc, macOS x64 and arm64, and Windows x64, so nothing compiles during installation. On 2026-11-16, `bun add defuss-dbsonl@0.5.0` and `npm install defuss-dbsonl@0.5.0` in empty projects each installed five packages, none of which declares an install script, and the `/server` entry stored and read a value under both Node.js and Bun on macOS arm64.
 
-To install a local build instead, `make release` writes the tarball to `validation/`; add it with `bun add ./validation/defuss-dbsonl-<version>.tgz`.
+To install a local build instead, `make release` writes the tarball to `output/`; add it with `bun add ./output/defuss-dbsonl-<version>.tgz`.
 
 ## Use
 
@@ -144,7 +144,7 @@ make bench-redis  # current build versus a throwaway loopback Redis, run as mise
 make bench-frames # values through batch against caller-encoded frames and frame() handles through batchFrames
 make dev      # rebuild the website demos and serve docs/ on 127.0.0.1:3000
 make vae      # verification, review and documentation gate
-make release  # tarball, source ZIP and checksums; never publishes or commits
+make release  # tarball and source ZIP in output/; never publishes or commits
 ```
 
 VERIFIED: `make verify` runs strict type checks, lint, real-storage tests, coverage thresholds and a packed-package suite on Node, Bun and Chromium, plus the website in WebKit at iPhone size. That suite runs mixed Node/Bun processes on both 0.2.0 and the current build, kills writers mid-batch and runs concurrent browser workers. `make release` packages only after the pinned defuss-vae 0.9.0 gate passes for the current source fingerprint. `make` lists every target; `.env.example` documents the browser executable overrides.

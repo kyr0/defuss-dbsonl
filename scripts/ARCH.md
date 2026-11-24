@@ -16,7 +16,7 @@ Scripts are TypeScript programs run by Bun; `compare-worker.ts` and `microbench.
 | `site.ts` | Bundles the website demos from `site/` into `docs/assets/`, resolving the package to built `dist/` entries; e2e passes the installed tarball instead |
 | `check-architecture.ts` | Requires an ARCH.md in every authored source directory, including tests and scripts |
 | `vae.ts` | Verifies the bundled VAE archive checksum and extracts its unchanged runtime into temporary storage; initializes a Git repository when none exists |
-| `release.ts` | Creates a complete source ZIP, tarball and integrity manifest without publishing; refuses to package unless the VAE gate passes for the current fingerprint |
+| `release.ts` | Packs the tarball and a source ZIP of the files Git tracks or does not ignore into `output/` without publishing; refuses to package unless the VAE gate passes for the current fingerprint. It writes nothing into tracked folders, because `validation/` holds the raw benchmark reports that docs/PERFORMANCE.md cites |
 
 The e2e server is loopback-only and serves an explicit path allowlist; e2e drives the website in Chromium and again in WebKit at iPhone size, where OPFS needs a persistent profile in `tmp/webkit-profile`. The Redis comparison binds its server to 127.0.0.1 with protected mode on, refuses a port whose server reports another data directory, and deletes its data directory afterwards. Package installation can contact the package registry, and the website check loads defuss-shadcn styles, its component and shader runtimes, ECharts and fonts from public CDNs. VAE extraction uses the bundled archive, so it needs no network request. Release scripts exclude dependencies, Git metadata, temporary state and browser profiles.
 

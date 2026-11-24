@@ -52,4 +52,11 @@ RULES = [{
                r"jest\.(?:mock|fn|spyOn)\(|vi\.(?:mock|fn|spyOn)\(|sinon\.|gomock\.|mock\.Mock\b|Mockito\.|@Mock\s|mockk\(|"
                r"@Mock(?:ito)?Bean\b|new\s+Mock<|Mock\.Of<|Substitute\.For<|A\.Fake<|mockall:{2}|#\[automock\]",
     "claim": "tests exercise real subsystems, not mock frameworks",
+}, {
+    "id": "release.no-validation-writes",
+    "kind": "not_regex",
+    "path": "scripts/release.ts",
+    # validation/ holds the raw benchmark reports docs/PERFORMANCE.md cites; release copies once overwrote two of them.
+    "pattern": r"validation/",
+    "claim": "make release writes only into output/, never over the cited reports in validation/",
 }]
