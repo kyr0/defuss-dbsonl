@@ -1,4 +1,4 @@
-# defuss-dbsonl 0.9.0
+# defuss-dbsonl 0.10.0
 
 Transactional key-value storage for Node.js, Bun and browser workers. Values are DSON, so dates, binary views, bigint, `undefined` and cyclic references survive storage. It is built on [defuss-dson](https://dson.defuss.org) 1.5.1 and [defuss-storage](https://storage.defuss.org) 0.4.1 and ships TypeScript declarations with ESM and CommonJS builds. It is designed as the backing store and API of [defuss-dataview](https://dataview.defuss.org), which adds filters, sorting and paging for table and tree grids. Project website: [dbsonl.defuss.org](https://dbsonl.defuss.org).
 
@@ -49,6 +49,8 @@ try {
 ```
 
 The transaction callback runs once. A concurrent commit that changed a key the callback read makes it fail with `CONFLICT` instead of retrying, because a retry would repeat any side effects in your callback; after a scan, any concurrent commit does. Retry explicitly where that is safe. Concurrent batches and transactions on one handle publish together: one write and one pair of flushes for the queued group, while each keeps its own revision and receipt. `ifRevision` gives compare-and-swap for changes prepared outside a transaction.
+
+A caller that already holds a value's DSON frame, for example because it keeps an encoded snapshot of the value, commits it with `batchFrames()` or `tx.putFrame()` instead of encoding the value again. DBSONL copies the frame and decodes it once to check it, so a damaged or partial frame is refused before it commits; reads return the value. A caller that encodes only to keep a snapshot until it commits can take it with `db.frame(value)` instead: the engine keeps the bytes, so committing the snapshot needs no copy and no check, and took 0.99 to 1.11 of the time of `batch` with the values, against 1.18 to 2.71 for encoding, decoding and committing the copy ([PERFORMANCE.md](docs/PERFORMANCE.md#caller-encoded-frames-on-macos-arm64)); [API](docs/API.md) lists the checks.
 
 For bulk reads, a snapshot's `scanBatches()` yields the same rows as `scan()` in arrays of up to 256. It tracks one pull per batch instead of one per row, so a full scan takes less time; [API](docs/API.md) has its byte budget and options.
 
@@ -139,6 +141,7 @@ make verify   # lint, tests, coverage, packed-package e2e
 make bench    # matched v0.2 versus current benchmarks
 make bench-scan   # full scans, row by row and in batches, against the vendored 0.5.0
 make bench-redis  # current build versus a throwaway loopback Redis, run as mise exec -- make bench-redis
+make bench-frames # values through batch against caller-encoded frames and frame() handles through batchFrames
 make dev      # rebuild the website demos and serve docs/ on 127.0.0.1:3000
 make vae      # verification, review and documentation gate
 make release  # tarball, source ZIP and checksums; never publishes or commits

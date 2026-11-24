@@ -65,32 +65,14 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-17T00:12:30Z s=a4ea8ca3 FINDING CHANGELOG.md:0.6.0 P-precision learn=none: Wording only.
 2026-11-17T00:40:14Z s=a4ea8ca3 FINDING src/core/io.ts:readCachedValues learn=none: Simplification; behavior covered by the existing batches test.
 2026-11-20T05:09:19Z s=ad85a3b9 FINDING src/core/store.ts:ReadSession.parallel learn=none: A timing regression; correctness is covered by the limit cases in tests/scan-workers.test.ts, and speed belongs to make bench-parallel, not a timed test.
-2026-11-20T05:30:47Z s=ad85a3b9 FINDING src/core/store.ts:settledHead and publishGroup Recovered branch learn=test: The permission test expects COMMIT_UNCERTAIN from compaction.
-2026-11-20T05:30:47Z s=ad85a3b9 FINDING tests/consumers/v2.ts learn=test: make e2e runs both checks from the packed package.
 2026-11-20T05:30:47Z s=ad85a3b9 FINDING src/core/store.ts:batchBytes/parallel scan, src/scan-pool.ts learn=none: A design decision recorded in ARCH.md; no code was added.
-2026-11-20T06:42:43Z s=ad85a3b9 FAIL tests.e2e.1
-2026-11-20T06:47:03Z s=ad85a3b9 DONE fp=ab41e4356dc7 cov=93.5% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+47)
-2026-11-20T06:47:03Z s=ad85a3b9 FINDING src/kept-files.ts:open learn=test: tests/native-performance.test.ts and tests/kept-files.test.ts use two backends with different limits on one database.
-2026-11-20T06:47:03Z s=ad85a3b9 FINDING src/server.ts:acquireNative (shared pins) learn=test: tests/commit-groups.test.ts bounds publications to 35 per 100 commits; it failed with 49 before the fix.
-2026-11-20T06:47:03Z s=ad85a3b9 FINDING src/kept-files.ts:track learn=test: tests/native-performance.test.ts expects 0 descriptors right after close.
-2026-11-20T06:47:03Z s=ad85a3b9 FINDING tests/native-v2.test.ts:permission learn=test: The test exercises the real EACCES publication path again.
 2026-11-20T06:47:03Z s=ad85a3b9 FINDING ARCH.md#parallel-scans learn=none: Documentation omission, no code.
 2026-11-20T06:47:03Z s=ad85a3b9 FINDING scripts/e2e.ts:Redis gauges learn=none: The assertion follows the published data by design.
-2026-11-20T13:19:22Z s=dbsonl-r FAIL tests.e2e.1
-2026-11-20T13:23:14Z s=dbsonl-r DONE fp=553e1014a834 cov=93.6% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+47)
-2026-11-20T13:23:14Z s=dbsonl-r FINDING src/core/store.ts:publishGroup (Recovered branch) learn=test: tests/format3.test.ts 'a write rejected before recovery stays rejected when its group is checked again' fails on memory and native storage without the fix and p
 2026-11-20T13:23:14Z s=dbsonl-r FINDING src/core/store.ts:ReadSession.parallel; src/core/tree.ts:split learn=none: A timing bound would pin this machine's speed; tests/scan-workers.test.ts now also runs {gte, limit} through the new planning path and compares rows with one th
 2026-11-20T13:23:14Z s=dbsonl-r FINDING CHANGELOG.md:13 B learn=none: One-off wording left from the 0.4.0 bump.
 2026-11-20T13:23:14Z s=dbsonl-r FINDING CHANGELOG.md:17 B learn=none: Figures were replaced in PERFORMANCE.md after the changelog line was written.
 2026-11-20T13:23:14Z s=dbsonl-r FINDING README.md:3 P learn=none: Version bump missed in the intro sentence.
 2026-11-20T13:23:14Z s=dbsonl-r FINDING src/core/io.ts:publish; src/core/backend.ts:locked; src/core/types.ts:ParallelScanRequest learn=none: Found by the docs stage's per-function check, which covers this class.
-2026-11-20T13:24:02Z s=ad85a3b9 FAIL tests.unit,coverage
-2026-11-20T13:44:20Z s=dbsonl-r DONE fp=197de4a4bb40 cov=93.5% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+49)
-2026-11-20T13:44:20Z s=dbsonl-r FINDING src/server.ts:spawnScanWorker; src/core/{common,io,tree,store}.ts constructors; tsconfig.json learn=verifier: make lint runs tsc with erasableSyntaxOnly, which rejects parameter properties, enums and namespaces, the syntax Node's type stripping cannot load.
-2026-11-20T13:45:20Z s=ad85a3b9 DONE fp=197de4a4bb40 cov=93.5% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+49)
-2026-11-20T23:08:15Z s=dbsonl-r DONE fp=1c34fc71cfe8 cov=93.5% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+50)
-2026-11-20T23:08:15Z s=dbsonl-r FINDING src/core/store.ts:remember (page cache eviction) learn=test: tests/mvcc.test.ts checks both limits at one page and 40 pages and that the cache is never emptied; removing the guard for the just-loaded page fails it (expect
-2026-11-21T00:02:09Z s=dbsonl-r DONE fp=12f1f67da5ce cov=93.8% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+52)
 2026-11-21T00:02:09Z s=dbsonl-r FINDING src/core/page.ts encodeCompactPage/decodeCompactPage, src/core/tree.ts toPage, src/core/io.ts Appender.compact, src/core/store.ts (format 4) learn=test: tests/format4.test.ts and tests/format3.test.ts cover hard keys, deletes, compaction, reopening, mismatch, malformed pages and format 3 staying format 3
 2026-11-21T00:02:09Z s=dbsonl-r FINDING tests/format3.test.ts format 2 case learn=test: the test runs on memory and native storage
 2026-11-21T00:02:09Z s=dbsonl-r FINDING src/core/page.ts decode (falsified hypothesis) learn=memory: recorded in .vae/MEMORY.md so nobody chases it again
@@ -106,3 +88,21 @@ Wrap: EVERY lead becomes a test | .vae/VERIFY.py rule | one MEMORY line with BC,
 2026-11-21T03:09:59Z s=dbsonl-r DONE fp=c26f23722d5f cov=94.4% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+55)
 2026-11-21T03:21:56Z s=dbsonl-r DONE fp=8bccbfe87ba0 cov=94.4% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+55)
 2026-11-21T03:21:56Z s=dbsonl-r FINDING package.json devDependencies.esbuild, bun.lock learn=test: make verify e2e bundles with esbuild
+2026-11-23T23:32:45Z s=cc782d00 DONE fp=a6a0e7be6e68 cov=94.4% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+21)
+2026-11-23T23:32:45Z s=cc782d00 FINDING src/core/store.ts:ownFrame learn=test: tests/frames.test.ts malformed test: a zero buffer of maxRecordBytes + 17 bytes must be RangeError; removing the bound fails it (mutation probe).
+2026-11-23T23:32:45Z s=cc782d00 FINDING tests/frames.test.ts:copy test learn=test: Mutations slice(), no copy and no trailing-bytes check each fail one frames test (probes, restored, no vae:probe left).
+2026-11-23T23:32:45Z s=cc782d00 FINDING tests/frames.test.ts:concurrent test title learn=none: Naming only; no recurring mechanism to check.
+2026-11-23T23:32:45Z s=cc782d00 FINDING ARCH.md:97 L03 learn=none: Epistemic wording; no deterministic rule expresses it.
+2026-11-23T23:32:45Z s=cc782d00 FINDING ARCH.md:96 B04 learn=none: One-off wording.
+2026-11-23T23:32:45Z s=cc782d00 FINDING CHANGELOG.md:5 S06/B03 learn=none: One-off wording.
+2026-11-23T23:32:45Z s=cc782d00 FINDING README.md:54 T04/P01 learn=none: One-off wording.
+2026-11-23T23:32:45Z s=cc782d00 FINDING docs/API.md:39 A10/P08 learn=none: One-off structure.
+2026-11-23T23:32:45Z s=cc782d00 FINDING tests/consumers/ARCH.md:8 P08 learn=none: One-off wording.
+2026-11-24T00:25:31Z s=cc782d00 DONE fp=80e1b9e99e85 cov=94.5% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+21)
+2026-11-24T00:25:31Z s=cc782d00 FINDING README.md:53, docs/API.md:43, CHANGELOG.md:5 B03 learn=none: Hand-computed ratios; no rule ties page numbers to output/bench-frames.json, which is gitignored and overwritten per run.
+2026-11-24T00:25:31Z s=cc782d00 FINDING docs/API.md:43 B01 (OwnedFrame across ESM and CJS) learn=none: Probe confirmed the documented behavior; a dual-build e2e test would pin an accepted limitation, not a requirement.
+2026-11-24T00:36:39Z s=dbsonl-r DONE fp=ecfaa3d60041 cov=94.5% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+60)
+2026-11-24T00:36:39Z s=dbsonl-r FINDING src/core/store.ts:publishGroup (Recovered branch) learn=test: tests/format3.test.ts 'a write rejected before recovery stays rejected when its group is checked again' fails on memory and native storage without the fix and p
+2026-11-24T00:36:39Z s=dbsonl-r FINDING release scope: paths unchanged since fingerprint 8bccbf (0.9.0 release plus the esbuild 0.28.2 bump, commit b7e8ba3) learn=none: Scope bookkeeping for a cumulative release session, not a defect.
+2026-11-24T00:39:28Z s=cc782d00 DONE fp=8aeac17f9e07 cov=94.5% paths=ARCH.md,CHANGELOG.md,Makefile,README.md(+25)
+2026-11-24T00:39:28Z s=cc782d00 FINDING validation/bench.json, validation/bench-scale.json, validation/coverage-summary.json, validation/e2e.json learn=none: Generated release evidence, no code or doc defect.

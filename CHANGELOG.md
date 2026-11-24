@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+VERIFIED: `db.batchFrames(mutations, options?)` and `tx.putFrame(key, frame)` commit DSON frames the caller already encoded, with the revisions, conflicts, commit groups, budgets and durability of `batch` and `put`. A `Uint8Array` frame is copied at call time and decoded once to check it; one that is not exactly one valid frame throws `TypeError`, one over a budget `RangeError`. `db.frame(value)` encodes a value into an `OwnedFrame` whose bytes stay in the engine, which those calls commit without a copy or a check. In a benchmark of 10,000 records, a caller that encodes each value, decodes the copy and commits it with `batch` took 1.18 to 2.71 times as long as `batch` alone; with `Uint8Array` frames it took 1.12 to 2.06 times, with `frame()` 0.99 to 1.11 times ([PERFORMANCE.md](docs/PERFORMANCE.md#caller-encoded-frames-on-macos-arm64)). The file format is unchanged. `make bench-frames` reproduces the measurement.
+
 ## 0.9.0
 
 VERIFIED: New databases use format 5, which writes index pages only at checkpoints. Between them, a commit appends its values, a compact list of its key changes and its record, and flushes once; the handle that wrote it keeps the changed pages in memory, and every other handle, process or worker replays the records since the last checkpoint. A commit is a checkpoint when the log reaches 16 MiB or the pages held in memory would exceed `maxCachePages`. On a 100,000-document defuss-db load with one ordered index, commits of 256 documents took 2.50 s in all instead of 3.35 to 3.92 s, a 64-document commit 4.39 ms instead of 5.89 to 6.08 ms, and the load wrote 29 to 31 MiB instead of 107 to 166 MiB. Format 2 to 4 databases keep their format; 0.8 refuses format 5 with `UNSUPPORTED`.

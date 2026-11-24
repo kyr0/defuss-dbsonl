@@ -5,7 +5,7 @@ BUN ?= bun
 export
 VAE := python3 tmp/vae-tooling/plugin/scripts/vae.py
 
-.PHONY: help setup build site dev lint test coverage e2e verify bench bench-scale bench-scan bench-parallel bench-redis metrics vae-setup vae prose release start stop restart status log
+.PHONY: help setup build site dev lint test coverage e2e verify bench bench-scale bench-scan bench-parallel bench-redis bench-frames metrics vae-setup vae prose release start stop restart status log
 help: ## List available targets.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "%-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 setup: ## Install pinned dependencies (Node, Bun, Redis), Chromium, WebKit and the VAE runtime.
@@ -41,6 +41,8 @@ bench-parallel: build ## Time a full native scan of 100000 documents in one thre
 	$(BUN) scripts/bench-parallel.ts
 bench-redis: build ## Compare the current build with a throwaway loopback Redis (pinned in mise.toml): reads, batches and transactions.
 	$(BUN) scripts/bench-redis.ts
+bench-frames: build ## Time committing 10000 records as values through batch against caller-encoded frames through batchFrames, under Node and Bun.
+	$(BUN) scripts/bench-frames.ts
 metrics: ## Print the last benchmark report.
 	@cat output/bench.json
 vae-setup: ## Extract the pinned VAE runtime without network access.

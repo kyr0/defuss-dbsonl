@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openDbsonl, createMemoryBackend, type Backend } from 'defuss-dbsonl';
 import { createFileBackend } from 'defuss-dbsonl/server';
+import { encodeFrame } from 'defuss-dson/sequence';
 
 const root = await mkdtemp(resolve('esm-'));
 try {
@@ -24,6 +25,13 @@ try {
     const batches = []; for await (const batch of session.scanBatches({ batchSize: 2 })) batches.push(batch);
     assert.equal(batches.length,1); assert.deepEqual(batches[0]![0]!.value,value); await session.close();
     assert.deepEqual(await db.verify(), { revision: 1, count: 1 }, label);
+    // Frames the caller encoded commit as they are and read back as values, in a batch and in a transaction.
+    await db.batchFrames([{ operation: 'put', key: 'framed', frame: encodeFrame(value) }, { operation: 'delete', key: 'typed' }]);
+    await db.transaction(tx => { tx.putFrame('staged', encodeFrame(value)); });
+    // A frame the handle encoded commits without a second check.
+    await db.batchFrames([{ operation: 'put', key: 'owned', frame: db.frame(value) }]);
+    for (const key of ['framed', 'staged', 'owned']) assert.deepEqual((await db.get(key)).value, value, `${label} ${key}`);
+    assert.deepEqual(await db.verify(), { revision: 4, count: 3 }, label);
     await db.close();
   }
   console.log(JSON.stringify({ runtime: process.versions.bun ? 'Bun' : 'Node', version: process.versions.bun ?? process.version, backends: backends.map(([label]) => label) }));

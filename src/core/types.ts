@@ -88,6 +88,15 @@ export interface Head {
   last?: Ref | null;
 }
 export type Mutation<T> = { operation: 'put'; key: string; value: T } | { operation: 'delete'; key: string };
+/** Type-only brand: a plain object with a byteLength is not an OwnedFrame. */
+declare const ownedFrame: unique symbol;
+/** A value Dbsonl.frame() encoded. Its bytes stay inside the engine, so batchFrames and putFrame commit it without copying or checking it again. */
+export interface OwnedFrame { readonly byteLength: number; readonly [ownedFrame]: true }
+/**
+ * A put whose value the caller already encoded: exactly one complete DSON frame, as encodeFrame of defuss-dson/sequence
+ * returns it, or the OwnedFrame of Dbsonl.frame().
+ */
+export type FrameMutation = { operation: 'put'; key: string; frame: Uint8Array | OwnedFrame } | { operation: 'delete'; key: string };
 export type Lookup<T> = { found: false; value?: never; revision?: never } | { found: true; value: T; revision: number };
 export interface Row<T> { key: string; value: T; revision: number }
 /** A key range of one snapshot and the exact number of its rows; pass gte and lt to scan or scanBatches. */
@@ -107,6 +116,8 @@ export interface Transaction<T> {
   readonly revision: number;
   get(key: string): Promise<Lookup<T>>;
   put(key: string, value: T): void;
+  /** put of a value the caller already encoded; the frame is checked and copied like batchFrames checks it. */
+  putFrame(key: string, frame: Uint8Array | OwnedFrame): void;
   delete(key: string): void;
   scan(options?: ScanOptions): AsyncIterableIterator<Row<T>>;
 }

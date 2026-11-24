@@ -1,6 +1,6 @@
 {
   "name": "defuss-dbsonl",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "High performance transactional DSON storage with a persistent copy-on-write index, MVCC snapshots, compaction and process-safe coordination.",
   "license": "MIT",
   "author": "Aron Homberg",

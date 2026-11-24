@@ -235,6 +235,23 @@ VERIFIED: `scripts/microbench.ts` checks equal, unequal, empty, short and unalig
 
 VERIFIED: The shared implementation uses the word loop with a byte fallback for unaligned buffers or lengths. Four-way unrolling did not consistently beat it across both engines and runs. The results support this specific choice, not a claim that all JITs or workloads are optimally compiled.
 
+## Caller-encoded frames on macOS arm64
+
+VERIFIED: One run of `mise exec -- make bench-frames` on 2026-11-24, on the host above, with Node 24.22.1, Bun 1.4.3 and defuss-dson 1.5.1, at a load average of 3.8 to 4.7. Each case commits 10,000 log records in batches of 256 into a new database: small records of a Date, three short strings and two numbers, 254 bytes per frame on average, and large ones whose message has about 1,900 characters, 3870 bytes per frame. Every path starts from the caller's values and ends when its last batch commits. `batch` commits the values. "Round trip" is a caller that keeps an owned snapshot of each value by encoding it and decoding the copy, then commits the copy with `batch`, which encodes it again. `batchFrames` is the same caller committing its `Uint8Array` frames, which DBSONL copies and decodes once to check. `frame()` is the same caller taking its snapshots with `db.frame()` and committing them with `batchFrames`, which neither copies nor decodes them. Two warmup rounds and seven measured rounds alternate the path order, garbage is collected before each run, and the four paths must write generations of the same size. Medians in milliseconds:
+
+| Runtime | Storage | Records | `batch` | Round trip + `batch` | `batchFrames` | `frame()` + `batchFrames` | `frame()` vs `batch` |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Node | memory | small | 26.3 | 53.4 | 43.8 | 27.8 | 1.06 |
+| Node | memory | large | 92.9 | 251.3 | 165.9 | 92.9 | 1.00 |
+| Node | native async | small | 172.1 | 202.4 | 192.8 | 176.4 | 1.02 |
+| Node | native async | large | 276.8 | 449.7 | 349.9 | 287.9 | 1.04 |
+| Bun | memory | small | 17.0 | 36.7 | 27.2 | 18.8 | 1.11 |
+| Bun | memory | large | 57.4 | 154.3 | 118.3 | 59.9 | 1.04 |
+| Bun | native async | small | 169.5 | 206.3 | 194.6 | 167.1 | 0.99 |
+| Bun | native async | large | 225.6 | 333.5 | 299.5 | 225.1 | 1.00 |
+
+VERIFIED: `Uint8Array` frames took 0.66 to 0.95 of the round trip's time, because they skip its second encode, but 1.12 to 2.06 of `batch`'s, because the caller's encode plus DBSONL's copy and checking decode cost more than DBSONL's single encode. `frame()` handles skip the copy and the decode, and took 0.99 to 1.11 of `batch`'s time: the snapshot costs the one encode that `batch` would run anyway. Two earlier runs on 2026-11-23, at a load average of 6.4 to 17.4 and before `frame()` existed, gave 0.67 to 0.94 of the round trip and 1.00 to 1.86 of `batch` for `Uint8Array` frames.
+
 ## Reproduction and scope
 
 ```sh
@@ -242,6 +259,7 @@ make setup
 make verify
 make bench        # 1000 records, both runtimes, async/sync/memory, 7 rounds
 make bench-scale  # 10000 records, both runtimes, native async, 3 rounds
+make bench-frames # 10000 records as values, caller-encoded frames or frame() handles, both runtimes, memory and native async
 ```
 
 VERIFIED: The checksum-pinned v0.2.0 and v0.3.0 tarballs are bundled under `vendor/`. Each benchmark child imports one built package, uses a new temporary database, checks every returned value and scan count, verifies the database, and closes it. Version order is reversed between runtimes. Reopen follows close; the OS filesystem cache is warm. The benchmark does not silently select a subset of rounds.

@@ -10,7 +10,7 @@ import type { HeadCache, ReadWindow } from './io.js';
 import { entries, entryPages, find, isMemoryPage, keyAt, split, toPage, BulkTree, BatchTree } from './tree.js';
 import type { Link } from './tree.js';
 import { encodeChanges } from './page.js';
-import type { Backend, Entry, Head, Page, ParallelScan, Partition, ReadOptions, Ref, Release, Options, Lookup, Row, ScanOptions, BatchScanOptions, Mutation, Commit, CommitOptions, Stats, Transaction } from './types.js';
+import type { Backend, Entry, Head, Page, ParallelScan, Partition, ReadOptions, Ref, Release, Options, Lookup, Row, ScanOptions, BatchScanOptions, Mutation, FrameMutation, OwnedFrame, Commit, CommitOptions, Stats, Transaction } from './types.js';
 
 type Encoded = { key: string; bytes: Uint8Array | undefined };
 /** A transaction's point reads, checked key by key at commit. After a scan or too many reads, whole falls back to the database revision. */
@@ -42,6 +42,33 @@ function newGeneration(): string {
   return crypto.randomUUID().replaceAll('-', '');
 }
 function code(error: unknown): string | undefined { return (error as { code?: string })?.code; }
+/**
+ * The bytes of every OwnedFrame that Dbsonl.frame() returned, by the frozen handle it returned. Only this module adds
+ * entries, so a look-alike object, a structured clone or a handle of another copy of the package (ESM beside CommonJS)
+ * is not found and is refused as a frame that is not a Uint8Array. A public flag that skips the check was rejected: any
+ * caller could set it on bytes that no encoder produced; see ARCH.md.
+ */
+const issuedFrames = new WeakMap<object, Uint8Array>();
+/**
+ * A caller's frame, owned and checked: a copy, so the caller, or another thread sharing its buffer, cannot change the
+ * bytes once checked, that holds exactly one frame and decodes under the limits readers apply, so every reader of this
+ * handle's budgets reads it back. decodeFrame checks the version, the declared length, both checksums and the DSON
+ * structure, and throws TypeError or RangeError as encodeFrame does for a value put cannot take; it ignores bytes after
+ * the frame, so they are refused here. VERIFIED: (probe, defuss-dson 1.5.1) encodeFrame and decodeFrame both bound the
+ * payload, not the frame, by maxRecordBytes, so a frame fits exactly when put would accept its value.
+ */
+function ownFrame(frame: Uint8Array | OwnedFrame, maxRecordBytes: number): Uint8Array {
+  // A frame that Dbsonl.frame() encoded needs no copy and no decode: its bytes never left the engine.
+  const issued = issuedFrames.get(frame);
+  if (issued) { if (issued.length - 16 > maxRecordBytes) throw new RangeError('A frame exceeds maxRecordBytes.'); return issued; }
+  if (!(frame instanceof Uint8Array)) throw new TypeError('A frame must be a Uint8Array or a frame from Dbsonl.frame().');
+  // Bounded before the copy, as readers bound a reference before reading it: no frame that fits is longer.
+  if (frame.length - 16 > maxRecordBytes) throw new RangeError('A frame exceeds maxRecordBytes.');
+  // new Uint8Array copies; Buffer's slice() would return a view of the caller's memory.
+  const owned = new Uint8Array(frame);
+  if (decodeFrame(owned, 0, { maxRecordBytes, maxDepth: 512, maxReferences: 1_000_000 }).byteLength !== owned.length) throw new TypeError('A frame must hold exactly one DSON frame and no other bytes.');
+  return owned;
+}
 /** Addresses inside a generation are immutable below its published end, so they name a page for good. */
 const pageId = (head: Readonly<Head>, ref: Ref) => `${head.generation}:${ref.offset}:${ref.byteLength}`;
 
@@ -437,14 +464,15 @@ export class Dbsonl<T = unknown> {
       return this.lookup(head, id);
     }));
   }
-  /** Capture values synchronously so subsequent caller mutation cannot change an admitted batch. */
-  private encode(input: readonly Mutation<T>[]): Encoded[] {
+  /** Capture values, or copies of frames, synchronously so subsequent caller mutation cannot change an admitted batch. */
+  private encode(input: readonly (Mutation<T> | FrameMutation)[], frames = false): Encoded[] {
     if (!Array.isArray(input) || input.length > this.limits.maxTransactionOperations) throw new DbsonlError('LIMIT_EXCEEDED', 'Transaction operation capacity exceeded.');
     let bytes = 0;
+    const { maxRecordBytes } = this.limits;
     const encoded = input.map(operation => {
       key(operation.key);
       if (operation.operation !== 'put' && operation.operation !== 'delete') throw new TypeError('Unknown mutation operation.');
-      const encoded = operation.operation === 'put' ? encodeFrame(operation.value, { maxRecordBytes: this.limits.maxRecordBytes }) : undefined;
+      const encoded = operation.operation !== 'put' ? undefined : frames ? ownFrame((operation as { frame: Uint8Array | OwnedFrame }).frame, maxRecordBytes) : encodeFrame((operation as { value: T }).value, { maxRecordBytes });
       bytes += (encoded?.length ?? 0) + operation.key.length * 2 + 64;
       if (bytes > this.limits.maxTransactionBytes) throw new DbsonlError('LIMIT_EXCEEDED', 'Transaction encoded-byte capacity exceeded.');
       return { key: operation.key, bytes: encoded };
@@ -654,12 +682,28 @@ export class Dbsonl<T = unknown> {
       if (written.has(id) || (entry?.revision ?? 0) !== seen) throw new DbsonlError('CONFLICT', 'A key the transaction read changed after its snapshot.');
     }
   }
+  /**
+   * Encode value now, as put would, into a frame that batchFrames and putFrame of any handle commit as it is: a snapshot
+   * of the value for a caller that queues it before it commits, encoded once.
+   */
+  frame(value: T): OwnedFrame {
+    const bytes = encodeFrame(value, { maxRecordBytes: this.limits.maxRecordBytes });
+    const handle = Object.freeze({ byteLength: bytes.length }) as unknown as OwnedFrame;
+    issuedFrames.set(handle, bytes);
+    return handle;
+  }
   /** Encode at call time, then publish the entire operation list under one new revision. */
-  batch(input: readonly Mutation<T>[], options: CommitOptions = {}): Promise<Commit> {
+  batch(input: readonly Mutation<T>[], options: CommitOptions = {}): Promise<Commit> { return this.admit(input, false, options); }
+  /**
+   * batch for values the caller already encoded, so they are not encoded twice: each frame is checked and copied at call
+   * time and written as it is. Reads decode it like any value.
+   */
+  batchFrames(input: readonly FrameMutation[], options: CommitOptions = {}): Promise<Commit> { return this.admit(input, true, options); }
+  private admit(input: readonly (Mutation<T> | FrameMutation)[], frames: boolean, options: CommitOptions): Promise<Commit> {
     if (this.closed) return Promise.reject(new DbsonlError('CLOSED', 'Database is closed.'));
     if (this.pending.size >= this.limits.maxPendingOperations) return Promise.reject(new DbsonlError('QUEUE_FULL', 'Too many admitted operations.'));
     let encoded: Encoded[];
-    try { abort(options.signal); encoded = this.encode(input); } catch (error) { return Promise.reject(error); }
+    try { abort(options.signal); encoded = this.encode(input, frames); } catch (error) { return Promise.reject(error); }
     const bytes = encodedBytes(encoded);
     if (this.reservedBytes + bytes > this.limits.maxPendingBytes) return Promise.reject(new DbsonlError('QUEUE_FULL', 'Pending encoded-byte capacity exceeded.'));
     this.reservedBytes += bytes;
@@ -689,8 +733,8 @@ export class Dbsonl<T = unknown> {
         reads.keys.set(id, lookup.found ? lookup.revision : 0);
       };
       const check = () => { if (!active) throw new DbsonlError('CLOSED', 'Transaction callback has finished.'); abort(options.signal); };
-      const stage = (operation: Mutation<T>) => {
-        check(); const encoded = this.encode([operation])[0]!;
+      const stage = (operation: Mutation<T> | FrameMutation, frames = false) => {
+        check(); const encoded = this.encode([operation], frames)[0]!;
         const old = staged.get(encoded.key);
         const nextSize = size - (old ? (old.bytes?.length ?? 0) + old.key.length * 2 + 64 : 0) + (encoded.bytes?.length ?? 0) + encoded.key.length * 2 + 64;
         if (nextSize > this.limits.maxTransactionBytes || (!old && staged.size >= this.limits.maxTransactionOperations)) throw new DbsonlError('LIMIT_EXCEEDED', 'Transaction capacity exceeded.');
@@ -705,6 +749,7 @@ export class Dbsonl<T = unknown> {
           const lookup = await session.get(id); observe(id, lookup); return lookup;
         },
         put: (id, value) => stage({ operation: 'put', key: id, value }),
+        putFrame: (id, frame) => stage({ operation: 'put', key: id, frame }, true),
         delete: id => stage({ operation: 'delete', key: id }),
         async *scan(scan = {}) {
           check();

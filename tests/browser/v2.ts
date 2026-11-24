@@ -3,6 +3,7 @@ import { createOPFSStorage } from 'defuss-storage/opfs';
 import { createDirectoryStorage } from 'defuss-storage/directory';
 import { createBrowserBackend } from 'defuss-dbsonl/browser';
 import { openDbsonl } from 'defuss-dbsonl';
+import { encodeFrame } from 'defuss-dson/sequence';
 self.onmessage = async ({ data }) => {
   try {
     const namespace = `dbsonl-${data.namespace}-${data.mode === 'directory' ? 'directory' : 'v2'}`;
@@ -49,6 +50,10 @@ self.onmessage = async ({ data }) => {
       }
     } else if (data.mode === 'write') {
       for (let i = 0; i < 30; i++) await db.put(`w-${i}`, i);
+      // Frames the caller encoded, on OPFS: in a batch and in a transaction.
+      await db.batchFrames([{ operation: 'put', key: 'w-frame', frame: encodeFrame(30) }]);
+      await db.transaction(tx => { tx.putFrame('w-frame-tx', encodeFrame(31)); });
+      if ((await db.get('w-frame')).value !== 30 || (await db.get('w-frame-tx')).value !== 31) throw new Error('OPFS frame commits failed.');
       await db.compact(); await db.collect();
     } else if (data.mode !== 'verify') {
       for (let i = 0; i < 15; i++) {

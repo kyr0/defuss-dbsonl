@@ -1,6 +1,7 @@
 /** CommonJS consumers exercise both the isomorphic and native entry points. */
 import { openDbsonl, createMemoryBackend } from 'defuss-dbsonl';
 import { createFileBackend } from 'defuss-dbsonl/server';
+import { encodeFrame } from 'defuss-dson/sequence';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 async function main() {
@@ -8,8 +9,9 @@ async function main() {
   try {
     for (const backend of [createMemoryBackend(), await createFileBackend(root)]) {
       const db = await openDbsonl<number>(backend, 'cjs', { create: true });
-      await db.transaction(tx => { tx.put('a', 1); tx.put('b', 2); });
-      if ((await db.verify()).count !== 2) throw new Error('CommonJS transaction failed.');
+      await db.transaction(tx => { tx.putFrame('a', db.frame(1)); tx.putFrame('b', encodeFrame(2)); });
+      await db.batchFrames([{ operation: 'put', key: 'c', frame: encodeFrame(3) }]);
+      if ((await db.verify()).count !== 3 || (await db.get('b')).value !== 2 || (await db.get('c')).value !== 3) throw new Error('CommonJS transaction or frame batch failed.');
       await db.close();
     }
     // The CommonJS build starts the ESM scan worker that ships beside it.
